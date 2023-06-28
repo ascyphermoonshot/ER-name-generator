@@ -183,37 +183,38 @@ model.load_state_dict(torch.load(r"/home/finch/Downloads/er_trained_model.h5"))
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 model = model.to(device)
 
-# Set the temperature for text generation
-temperature = 0.8
-
 # Initialize the starting context
 context = torch.zeros((1, 1), dtype=torch.long, device=device)
 
-# Generate text with temperature control
+def load_words(file_path):
+    with open(file_path, 'r', encoding='utf-8') as f:
+        return set(f.read().split())
+
+def filter_episodes(generated_text, original_episodes_path, words_path):
+    decoded_text = decode(generated_text)
+
+    words = load_words(words_path)
+
+    with open(original_episodes_path, 'r', encoding='utf-8') as f:
+        original_episodes = set(f.read().replace("\n", " ").splitlines())
+
+    generated_episodes = set(decoded_text.splitlines())
+
+    new_episodes = generated_episodes - original_episodes
+
+    valid_episodes = []
+    for episode in new_episodes:
+        if len(episode) >= 2 and set(episode.split()).issubset(words):
+            valid_episodes.append(episode)
+
+    return valid_episodes
+
+def print_valid_episodes(valid_episodes):
+    print("New valid episodes: {}%".format(len(valid_episodes) / len(generated_episodes) * 100))
+    print()
+    for episode in valid_episodes:
+        print(episode)
+        
 generated_text = model.generate(context, max_new_tokens=2000)[0].tolist()
-decoded_text = decode(generated_text)
-with open(r"/home/finch/Downloads/words.txt", 'r', encoding='utf-8') as f:
-    words = f.readlines()
-text.replace("/n"," ")
-erwords=text
-erwords=erwords.split()
-words=list(set(words+erwords))
-with open(r"/home/finch/Downloads/er.txt", 'r', encoding='utf-8') as f:
-    text = f.read()
-gepisodes=decoded_text.splitlines()
-oepisodes=text.splitlines()
-nepisodes=[]
-for epi in gepisodes:
-    if epi not in oepisodes:
-        nepisodes.append(epi)
-for epi in nepisodes:
-    if len(epi)<2:
-        nepisodes.pop(nepisodes.index(epi))
-for epi in nepisodes:
-    ewords=epi.split()
-    if not(set(ewords).issubset(set(words))):
-        nepisodes.pop(nepisodes.index(epi))
-print("new valid episodes: ",len(nepisodes)/len(gepisodes)*100,"%")
-print(" ")
-for episode in nepisodes:
-    print(episode)
+valid_episodes = filter_episodes(generated_text, "/home/finch/Downloads/er.txt", "/home/finch/Downloads/words.txt")
+print_valid_episodes(valid_episodes)
